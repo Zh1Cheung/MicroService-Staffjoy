@@ -1,0 +1,72 @@
+# https://matthewpalmer.net/kubernetes-app-developer/articles/kubernetes-apiversion-definition-guide.html
+
+# 数组是以"-"开头的.
+# 三个横线表示文档开始
+
+
+# apiVersion: 资源对象所支持的分组与版本。
+apiVersion: extensions/v1beta1
+# kind: 指定这个资源对象的类型，如 pod ，deployment,statefulset,job,cronjob
+# pod是单一亦或一组容器的合集 deployment是pod版本管理的工具 用来区分不同版本的pod
+kind: Deployment
+# metadata: 常用的配置项有 name,namespace,即配置其显示的名字与归属的命名空间。
+metadata:
+  name: account-svc-deployment
+# spec: Pod中容器的详细定义,一个嵌套字典与列表的配置项，也是主要的配置项，支持的子项非常多，根据资源对象的不同，子项会有不同的配置。
+spec:
+  replicas: 1
+  template:
+    metadata:
+      # 自定义标签，Label是自定义的一些key/value对，你可以随心所欲的设置。
+      labels:
+        app: account-svc
+        env: prod
+    spec:
+      # 使用一个列表，配置容器的属性
+      containers:
+        # 容器在k8s中显示的名字
+        - name: account-svc
+          # 在容器仓库中，真实存在的、具体的镜像的名称
+          image: Zh1Cheung/account-svc
+          ports:
+            # 端口号名称
+            - name: http-port
+              # 容器需要监听的端口号
+              containerPort: 80
+          envFrom:
+            - configMapRef:
+                name: common-config
+        　# 挂载到容器内部的存储卷配置
+        volumeMounts:
+          # 引用pod定义的共享存储卷的名称，需用volumes[]部分定义的的卷名
+          - name: logback-config-volume
+            # 存储卷在容器内mount的绝对路径
+            mountPath: /etc/staffjoy
+      # 在该pod上定义共享存储卷列表
+      volumes:
+        # 共享存储卷名称
+        - name: logback-config-volume
+          # 类型为configMap的存储卷，挂载预定义的configMap对象到容器内部
+          configMap:
+            name: logback-config
+---
+apiVersion: v1
+# Service是一个抽象概念，定义了一个服务的多个pod逻辑合集和访问pod的策略，一般把service称为微服务
+# 举个例子 ：一个a服务运行3个pod，b服务怎么访问a服务的pod，pod的ip都不是持久化的重启之后就会有变化。这时候b服务可以访问跟a服务绑定的service，
+# service信息是固定的提前告诉b就行了，service通过Label Selector跟a服务的pod绑定,无论a的pod如何变化对b来说都是透明的
+kind: Service
+metadata:
+  name: account-service
+# Label的最常见的用法便是通过spec.selector来引用对象，管理pod
+spec:
+  selector:
+    app: account-svc
+    env: prod
+  ports:
+    - protocol: TCP
+      # spec.ports.port: 80表明此Service将会监听80端口，并将所有监听到的请求转发给其管理的Pod。
+      # port端口是service对外暴露的端口
+      port: 80
+      # spec.ports.targetPort: 81表明此Service监听到的80端口的请求都会被转发给其管理的Pod的81端口
+      # targetPort对应的是pod的端口
+      targetPort: 80
