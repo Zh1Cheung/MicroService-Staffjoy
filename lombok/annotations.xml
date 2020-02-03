@@ -1,0 +1,5 @@
+<root>
+    <item name='lombok.RequiredArgsConstructor'>
+        <annotation name='java.lang.Deprecated'/>
+    </item>
+</root>
