@@ -1,0 +1,298 @@
+项目名称 ：Staffjoy
+
+-----
+
+开发时间：三个月
+
+-----
+
+需求分析	：
+
+1. 微服务和云原生架构是目前互联网行业的技术热点，相关资料文档很多，但是缺乏端到端的贴近生产的案例，这就使得很多互联网开发人员(包括架构师)，虽然学习了很多微服务理论，但是在真正落地实施微服务云原生架构的时候，仍然会感到困惑。
+	云原生架构：
+		1. CloudNative 直译过来是云原生，基于微服务原理而开发的应用，以容器方式打包。在运行时，容器由运行于云基础设施之上的平台进行调度。应用开发采用持续交付和 DevOps 实践。
+		2. CNCF 给出了云原生应用的三大特征:容器化封装、面向微服务、动态管理（通过集中式的编排调度系统来实现动态的管理和调度）
+
+	2. Staffjoy 应用的业务功能相对简单，简单讲就是帮助小企业管理者管理雇员和排班，并以短信或者邮件等方式，将排班信息及时通知到雇员。具体讲，Staffjoy 主要支持两类用户角色和用例，一类是公司管理员(admin)，他们可以通过 Staffjoy 管理公司(company)、员工目录(directory)，团队(team)和雇员(worker)，也可以创建任务(job)，创建和发布班次(shift)信息；另一类是公司雇员，他们可以通过 Staffjoy 管理电话和邮件等个人信息，便于接收到对应的排班通知。
+
+	3. Staffjoy 应用主要以共享版 SaaS 服务形式提供，也支持针对一些大客户的定制私有部署，这就要求 Staffjoy 应用易于部署和运维，要支持一键部署到Kubernetes等容器云环境。 
+
+-----
+
+
+构思： 基于 Spring Boot 和 Kubernetes 技术栈，架构、设计和开发一个准生产级的微服务SAAS应用，并最终部署到Kubernetes容器云环境
+
+-----
+
+
+使用的技术：
+所有微服务(绿色标注)采用Spring REST开发，有数据访问交互的采用Spring Data JPA，数据库使用MySQL。WWW 服务使用Spring MVC+Thymeleaf模版引擎开发。Faraday 也是一个SpringBoot应用，内部路由和安全等逻辑基于Servlet Filter实现。
+
+
+	- Docker Compose
+	- Kubernetes
+
+经过调用链埋点监控后，在 Skywalking Dashboard 上实时呈现出来服务依赖关系图
+
+-----
+
+
+项目架构 ：
+	1. 整个项目采用微服务架构，并且可以一键部署到 Kubernetes 容器云环境。
+
+	2.	- Account API(账户服务)，提供账户注册、登录认证和账户信息管理等基本功能。
+		- Company API(公司服务)，支持团队(Team)，雇员(Worker)，任务(Job）和班次(Shift)等核心领域概念的管理功能。
+		- Bot API，是一个消息转发服务，它一方面作为队列可以缓冲高峰期的大量通知消息，另一方面作为代理可以屏蔽将来可能的通知方式的变更。
+		- Mail Sender 和 SMS Sender，都是消息通知服务，分别支持邮件和短信通知方式，它们可以对接各种云服务，比如阿里云邮件或短信服务。
+		- WhoAmI API，支持前端应用获取当前登录用户的详情信息，包括公司和管理员身份，团队信息等，它也可以看作是一个用户会话(Session)信息服务。
+		- App(也称 MyCompany)，单页 SPA 应用，是整个 Staffjoy 应用的主界面，公司管理员通过它管理公司、雇员、任务和排班等信息。
+		- MyAccount ，单页 SPA 应用，它主要支持公司雇员管理个人信息，包括邮件和电话等，方便接收排班通知消息。
+		- WWW 应用， 是一个前端 MVC 应用，它主要支持产品营销、公司介绍和用户注册登录/登出，这个应用也称为营销站点(Marketing Site)或者登录页(Landing Page)应用。
+		- Faraday(法拉弟)，是一个反向代理(功能类似 nginx)，也可以看作是一个网关(功能类似 zuul)，它是用户访问 Staffjoy 微服务应用的流量入口，它既实现对前端应用和后端 API 的路由访问，也实现登录鉴权和访问控制等安全功能。Faraday 代理是 Staffjoy 微服务架构和前后分离架构的关键，并且它是唯一具有公网 IP 的服务。
+
+ 
+
+
+系统架构设计和技术栈选型
+	1. 为何采⽤微服务架构： 
+			分而治之，单一职责，关注分离
+	2. Dubbo、SpringCloud和K8s该如何选择： 		
+			服务发现、API网关、配置管理、容错限流、日志监控、Metrics监控、调用链监控
+			K8s有发布和调度、自动伸缩、进程隔离、环境管理、资源配额
+	3. 技术中台到底讲什么
+				技术中台构建于第三方公有云之上
+				AccountAPI、CompanyAPI为业务中台
+				WWW、MyAccount、App为业务前台
+	4. 数据和接口模型设计：
+					RestfulAPI
+
+
+
+服务开发框架设计
+
+	1. 如何实现统一异常处理
+		@RestControllerAdvice注解的类统一进行异常处理
+		@ExceptionHandler注解在BaseReponse类型的HandleError方法上进行统一异常捕获（BaseReponse类使用@Data、NoArgsConstructor、AllArgsContrustor、Builder注解）
+	2. DTO和DMO为什么要互转
+		DTO:数据传输层对象
+		DMO:数据模型对象
+		数据传输对象是根据UI的需求进行设计的，而不是根据数据模型对象进行设计的。比如，
+		Customer模型对象可能会包含一些诸如FirstName, LastName, Email, Address等信息。但如果UI上不打算显示Address的，那么CustomerDTO中也无需包含这个 Address的数据。
+		DTO的存在是为了跟Model解耦，当业务逻辑需要改变Model时，而不需要改变UI界面时，就只要改变Model里面的数据。
+	3. 异步处理为何要复制线程上下文信息
+		使用ThreadPoolTaskExecutor线程池
+		@Async方法的调用方和被调用方不能在同一个bean中（trackEvent方法调用在X类中的@Async注解的方法，@Async注解的方法在Y类中）
+		异步调用会提交到线程池中异步执行，异步调用过程中线程会发生切换，上下文信息会发生变化，需要线程上下文拷贝，设置了一个装饰类（把请求上下文传递给了一个新的线程）
+	4. 微服务接口参数校验为何重要
+		控制器接口参数校验：listAcoounts（@RequestParam int offset）等
+		DTO参数校验：@NotNull @NotBlank等
+		自定义标注
+	5. 如何实现基于Feign的强类型接口
+		Feign：动态代理里最重要的两点：序列化反序列化
+		api接口模块（强类型的接口，生成强类型的客户端）、svc服务实现模块
+		@FeignClinet 运行期Spring会自动扫描注解并生成强类型的客户端
+		正常返回：例如ListAccountBaseResponse 异常返回：BaseResponse
+		好处：规范代码风格、提高编码测试效率
+	6. 考虑分环境配置
+		DEV---TEST---UAT---PROD
+	7. 为什么采用单体仓库：
+		微服务化后子模块都在一个仓库里
+	8. Swagger 接口文档
+
+
+
+可编程网关设计
+
+	1. 网关和反向代理是什么关系
+		代理是代替客户端去访问服务器，反向代理是代替服务器接受客户端的请求
+		微服务时代，出现了大量提供API的服务，对路由、安全这些动态配置的要求很高，传统反向代理静态不灵活，API网关作为补充就诞生了，主要面向API微服务，提供动态可配置能力。
+		云原生时代，要求更高，产生了统一代理，提供了动态可配置能力，动态可编程能力。
+	
+	2. 网关需要分集群部署吗
+		
+		用户体验层（外网）-》网关层（各种网关）-》BFF层（各种BFF）-》微服务层（各种模块）
+	3. Faraday网关
+
+		基于ServletFilter实现。
+		请求进入路由解析模块，对请求的HTTP信息进行解析，查询路由映射表找到相应的服务，然后将请求传入请求截获器，接着请求进入到请求转发模块。请求转发模块查询HttpClient映射表找到具体的服务进行请求。响应依次返回请求转发模块，响应截获器。
+
+		路由映射表存放了路由信息（本地配置静态或动态配置Eureka等服务发现框架）。
+		HttpClient映射表存放了服务和实际访问该服务的HttpClient的关系，如果路由映射表有更新，HttpClient映射表也会更新。采用提前加载的机制，提前初始化，提升性能。
+		请求截获器，响应截获器Interceptor对请求响应做进一步处理扩展网关的能力（用户认证鉴权等）。
+
+	4. 生产级网关的需要考虑哪些方面
+		限流熔断
+		动态路由和负载均衡
+		基于Path的路由（静态路由）
+		截获器链
+
+
+安全框架设计和实践
+
+	1. 基于JWT令牌的安全认证架构
+		无状态： 客户端到服务器的每个请求都必须包含理解请求所需的所有信息，并且不能利用服务器上存储的任何上下文。因此，会话状态完全保留在客户端上
+
+		RESTful架构的前后端，天然要求API是无状态的，JWT(JSON Web Token)简单易用，适合在分布式系统中做API无状态的身份认证。
+
+		客户端请求先去认证中心拿到JWT令牌，然后请求带着JWT到达网关，网关对JWT进行校验，校验成功后请求到达微服务模块，然后返回响应。
+
+		两种流程：HMAC——加密解密算法   RSA——公私钥
+
+		JWT缺陷：JWT使用起来虽然简单方便，但它存在一个设计缺陷，即服务端无法主动注销token，所以jwt在安全性上不及session，实际开发中应谨慎使用。如果要让服务端能够注销token，就要在服务端维持token状态，这又回到session机制了，所以在经常需要验证的场景中，建议还是使用session。JWT这个缺陷决定了它更适合用在一次性token验证场景中，即token只使用一次就立即废弃掉，比如第三方登录授权。
+
+	2. 用户角色鉴权：登陆成功后返回cookie中写入JWT，下次再请求时带着JWT进行请求。
+			网关JWT校验和取出用户会话数据（userid）(faraday/AuthRequestInterceptor)	
+			网关传递认证授权信息(faraday/AuthRequestInterceptor)	
+
+			因为需要userid，所以需要认证上下文助手类(common/AuthContext)可以获得上下文请求的一些信息（Spring提供的机制：RequestContextHolder）
+			客户端向服务端（后端里端到端的调用 例如whoami调用company api）发送请求时通过Feign客户端传递用户认证信息(common/FeignRequestHeaderInterceptor)，将userid向后传递。
+
+	3. 服务调用鉴权：
+		服务间调用授权截获器：实现了Authorize注解， 创建一个AuthorizeInterceptor类继承HandlerInterceptorAdapter，就可以对Authorize注解进行配置
+
+		控制器调用鉴权（XXXController）： 每个方法上添加@Authorize注解，Value里添加了各种Header服务，表明了只有这些Header服务可以调用这个方法
+
+		用户角色和环境鉴权：方法里进一步鉴权
+
+		API Client传递服务调用方：方法里不仅要添加所要传入的参数，还要添加Header，表明是什么Header服务调用此方法
+
+		  
+
+
+
+服务测试设计
+
+	单元测试：确保类、模块功能正确 单元测试（模块测试）是开发者编写的一小段代码，用于检验被测代码的一个很小的、很明确的功能是否正确
+			
+			@SpringBootTest
+			@AutoConfigureMockMvc
+				@Autowired MockMvc
+				@MockBean了Service
+			通过Mockmvc模拟请求方法，返回结果转化为Response进行验证， 
+			assertThat（xxx）
+			验证调用次数
+
+	集成测试：确保组件间接口、交互和链路正确 将所有模块按照设计要求（如根据结构图）组装成为子系统或系统，进行集成测试。
+	   		@SpringBootTest(WebEnvironment=SpringBootTest.WebEnvironment.DEFINE_POST)
+	   		@EnableFeignClient(basePackages={"xyz.staffjoy.account.client"})
+	   		@MockBean了client
+	   		构造请求Body，由xxxclient进行调用，得到响应
+	   		验证参数： ArgumentCaptor
+
+	组件测试：确保微服务作为独立整体，接口功能正确
+			例如LoginControllerTest进行登入登出（把WWW模块当作一个黑盒）
+
+
+
+可运维架构设计
+
+	1. Apollo vs Spring Cloud Config vs K8s ConfigMap
+		配置界面、配置存储、配置生效时间、动态配置、版本管理、灰度发布等
+
+	2. CAT vs Zipkin Vs Skywalking
+		调用链可视化，服务依赖图，聚合报表，埋点方式，指标监控等
+
+	3. 结构化日志和审计日志
+		展示出有结构的形式：JSON形式，ELK可以读取
+		structlog4j框架
+		LogEntry审计日志：结构化日志的包装类    logger.info()
+
+	4. 集中异常监控和Sentry
+		生产环境下，异常发送给Sentry Client
+	5. ELK & Prometheus & Skywalking + K8s部署架构
+		日志收集
+
+
+云原生架构和Kubernetes容器云部署
+
+
+	1. 本地测试Kubernetes部署文件
+		镜像构建
+			mvn clean package -DskipTests
+			docker-compose build
+			docker images
+		部署mysql
+			staffjoy_account
+			staffjoy_company
+		部署staffjoy
+			kubectl apply -f config.yml
+			kubectl apply -f test
+		端口转发
+			查询faraday pod名 : Kubectl get pods
+			kubectl port-forward faraday-svc-deployment-8584d9c74d-v92wt 80:80
+		启用SwitchHosts
+		校验
+			命令行校验
+			Dashboard校验
+			Staffjoy校验
+	2. 阿里云Kubernetes环境
+		Kubernetes 环境创建
+			创建 VPC
+			创建 RDS 数据库
+			创建共享版 Kubernetes 集群
+			校验
+		部署 Staffjoy
+			kubectl apply -f config
+			kubectl apply -f uat
+		阿里云 Dashboard 校验
+	
+
+
+
+
+-----
+
+生命周期：
+
+同Kubernetes容器云部署
+
+
+需求->架构设计->框架搭建->服务实现->测试->可运维架构->容器云部署
+
+-----
+
+
+
+项目职责： 后端设计
+
+
+-----
+
+亮点：
+	1. 在开发语言框架上，用国内更主流的 Spring(Boot)实现微服务
+ 	2. 在架构上，使用 Spring(Boot)开发，直接支持 HTTP/REST 接口
+ 	3. 是一个较完整的 SaaS 应用，并且架构设计中考虑了很多生产性环节
+
+-----
+
+
+
+体会：
+	1. 命名规范
+	2. 注释书写
+	3. 解耦
+	4. 代码可读性
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

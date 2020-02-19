@@ -4,26 +4,33 @@ Microservice demo-Refactoring staffjoy function
 SpringBoot+K8s.
 
 
-# Getting Started
 
-### Reference Documentation
-
-For further reference, please consider the following sections:
-
-- [Official Apache Maven documentation](https://maven.apache.org/guides/index.html)
-- [Spring Boot Maven Plugin Reference Guide](https://docs.spring.io/spring-boot/docs/2.2.1.RELEASE/maven-plugin/)
-- [Spring Web](https://docs.spring.io/spring-boot/docs/2.2.1.RELEASE/reference/htmlsingle/#boot-features-developing-web-applications)
-- [Spring Web Services](https://docs.spring.io/spring-boot/docs/2.2.1.RELEASE/reference/htmlsingle/#boot-features-webservices)
-
-### Guides
-
-The following guides illustrate how to use some features concretely:
-
-- [Building a RESTful Web Service](https://spring.io/guides/gs/rest-service/)
-- [Serving Web Content with Spring MVC](https://spring.io/guides/gs/serving-web-content/)
-- [Building REST services with Spring](https://spring.io/guides/tutorials/bookmarks/)
-- [Accessing data with MySQL](https://spring.io/guides/gs/accessing-data-mysql/)
-- [Producing a SOAP web service](https://spring.io/guides/gs/producing-web-service/)
+## 项目展示
 
 
 
+- 首页产品介绍和注册
+
+![1](image\1.png)
+
+- 产品订阅计划和报价
+
+![2](image\2.png)
+
+- 登录页
+
+![3](image\3.png)
+
+- App 管理员排班界面
+
+![4](image\4.png)
+
+
+
+
+
+## 详细文档
+
+
+
+Project summary.txt
